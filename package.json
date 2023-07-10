@@ -14,7 +14,7 @@
   "type": "commonjs",
   "name": "memkvstore",
   "description": "MemKvStore is a key-value store class implemented in TypeScript. It supports a variety of advanced features, including time-to-live (TTL) for keys, secondary indexing, write-ahead logging (WAL), multi-node consensus, data partitioning, versioning and conflict resolution, batch operations and atomic transactions, event sourcing and CQRS (Command Query Responsibility Segregation), snapshots, and partitioning.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist/index.js",
   "keywords": [],
   "author": "Alexa Matei",
