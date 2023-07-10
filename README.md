@@ -19,26 +19,18 @@
 
 ## Usage
 
-First, you need to create a storage engine. The storage engine is responsible for actually storing the data. You can use the already packaged Storage Engine:
-
-```typescript
-import { InMemoryStore } from "memkvstore";
-
-let memoryStore = new InMemoryStore<any, any>();
-```
-
-Use the created *memoryStore* instance in the Store class:
+You can use your own storage strategy that needs to implement *StorageEngine*, but you can also use the already packaged *InMemoryStore* module:
 
 ```typescript
 import { Store } from "memkvstore";
 
-let store = new Store<any, any>(memoryStore);
+let store = new Store<any, any>();
 ```
 
 That's it! You can now use the *store* instance as following:
 
 ```typescript
-await store.set("key", "value");
-await store.get("key");
-await store.delete("key");
+await store.set("key", "value"); // it will return undefined
+await store.get("key"); // it will return { value: "value", version: 0 } (example)
+await store.delete("key"); // it will return undefined
 ```
