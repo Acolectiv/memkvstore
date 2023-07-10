@@ -53,15 +53,15 @@ jobs:
           git commit -m "chore: release ${{ env.NEW_VERSION }}"
           git tag ${{ env.NEW_VERSION }}
 
-      # Publish version to public repository
-      - name: Publish
-        run: npm publish --tag ${{ env.RELEASE_TAG }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
-
       # Push repository changes
       - name: Push changes to repository
         env:
           GITHUB_TOKEN: ${{ secrets.gh_token }}
         run: |
           git push origin && git push --tags
+
+      # Publish version to public repository
+      - name: Publish
+        run: npm publish --tag ${{ env.RELEASE_TAG }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
