@@ -1,15 +1,16 @@
 {
     "compilerOptions": {
-        "module": "CommonJS",
+        "module": "es2022",
         "noImplicitAny": true,
         "removeComments": true,
         "preserveConstEnums": true,
         "sourceMap": true,
         "moduleResolution":"node",
         "esModuleInterop": true,
-        "lib": ["es2017"],
-        "types": ["node"]
+        "lib": ["es2022"],
+        // "types": ["node"],
+        "target": "es2022"
     },
-        "include": ["src/"],
+        "include": ["/"],
         "exclude": ["node_modules", "jest.config.js"]
 }

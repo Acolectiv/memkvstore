@@ -1,10 +1,8 @@
 // @ts-ignore
 import fs from 'fs';
-import path from 'path';
 import { RWLock } from 'async-rwlock';
 // @ts-ignore
 import { fork, ChildProcess } from 'child_process';
-import zlib from 'zlib';
 // @ts-ignore
 import crypto from 'crypto';
 
@@ -21,19 +19,19 @@ interface Event<K, V> {
     version: number;
 }
 
-interface VersionedValue<V> {
+export interface VersionedValue<V> {
     value: V;
     version: number;
 }
 
-interface StorageEngine<K, V> {
+export interface StorageEngine<K, V> {
     get(key: K): Promise<VersionedValue<V> | undefined>;
     set(key: K, value: VersionedValue<V>): Promise<void>;
     delete(key: K): Promise<void>;
     entries(): Promise<[K, VersionedValue<V>][]>;
 }
 
-class KVStore<K, V> {
+export class Store<K, V> {
     private commands: Command<K, V>[] = [];
     private events: Event<K, V>[] = [];
     private timeouts: Map<K, any> = new Map();
@@ -63,7 +61,7 @@ class KVStore<K, V> {
         if (nodePaths) {
             for (const nodePath of nodePaths) {
                 const node = fork(nodePath);
-                node.on('message', (message) => {
+                node.on('message', (message: any) => {
                     if (message.type === 'consensus') {
                         const consensus = this.consensus.get(message.id);
                         if (consensus) {
@@ -95,6 +93,18 @@ class KVStore<K, V> {
             const timeout = setTimeout(() => this.delete(key), ttl);
             this.timeouts.set(key, timeout);
         }
+        this.lru.unshift(key);
+        if (this.lru.length > this.maxEntries!) {
+            const evictedKey = this.lru.pop()!;
+            await this.storage.delete(evictedKey);
+        }
+        const index = this.secondaryIndex.get(value) || [];
+        index.push(key);
+        this.secondaryIndex.set(value, index);
+        if (this.wal) {
+            const encryptedValue = crypto.createCipher('aes-256-cbc', this.secretKey).update(JSON.stringify(versionedValue), 'utf8', 'hex');
+            this.wal.write(`${key} ${encryptedValue}\n`);
+        }
     }
 
     public async delete(key: K): Promise<void> {
@@ -105,6 +115,23 @@ class KVStore<K, V> {
             this.events.push({ type: 'delete', key, version: existing.version });
             clearTimeout(this.timeouts.get(key)!);
             this.timeouts.delete(key);
+            const index = this.secondaryIndex.get(existing.value) || [];
+            const keyIndex = index.indexOf(key);
+            if (keyIndex !== -1) {
+                index.splice(keyIndex, 1);
+            }
+            if (index.length === 0) {
+                this.secondaryIndex.delete(existing.value);
+            } else {
+                this.secondaryIndex.set(existing.value, index);
+            }
+            const lruIndex = this.lru.indexOf(key);
+            if (lruIndex !== -1) {
+                this.lru.splice(lruIndex, 1);
+            }
+            if (this.wal) {
+                this.wal.write(`${key} null\n`);
+            }
         }
     }
 
@@ -151,5 +178,34 @@ class KVStore<K, V> {
         } finally {
             this.lock.unlock();
         }
+    }
+
+    public async snapshot(): Promise<number> {
+        const snapshot = new Map<K, VersionedValue<V>>();
+        for (const [key, versionedValues] of this.versions as any) {
+            snapshot.set(key, versionedValues[versionedValues.length - 1]);
+        }
+        this.snapshotVersion += 1;
+        this.snapshots.set(this.snapshotVersion, snapshot);
+        return this.snapshotVersion;
+    }
+
+    public async restore(snapshotVersion: number): Promise<void> {
+        const snapshot = this.snapshots.get(snapshotVersion);
+        if (!snapshot) {
+            throw new Error(`Snapshot ${snapshotVersion} does not exist`);
+        }
+        this.versions.clear();
+        for (const [key, versionedValue] of snapshot as any) {
+            this.versions.set(key, [versionedValue]);
+        }
+    }
+
+    public async getPartition(key: K): Promise<number> {
+        return this.partitions.get(key) || 0;
+    }
+
+    public async setPartition(key: K, partition: number): Promise<void> {
+        this.partitions.set(key, partition);
     }
 }
