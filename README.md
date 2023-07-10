@@ -10,7 +10,6 @@
 - **Write-ahead logging (WAL):** Changes are logged before they are applied, ensuring data integrity.
 - **Multi-node consensus:** Multiple nodes can agree on the state of the data.
 - **Data partitioning:** Data can be split across multiple nodes.
-- **Data compression and encryption:** Data can be compressed and encrypted before being stored.
 - **Versioning and conflict resolution:** Multiple versions of a value can be stored, and conflicts between versions can be resolved.
 - **Batch operations and atomic transactions:** Multiple operations can be performed as a single atomic transaction.
 - **Event sourcing and CQRS:** Changes to the data are stored as a sequence of events, which can be replayed to reconstruct the current state.

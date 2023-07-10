@@ -1,6 +1,9 @@
-import { StorageEngine, VersionedValue } from "../Store.js";
+import {
+    StorageEngine,
+    VersionedValue
+} from "../types";
 
-export default class InMemoryStore<K, V> implements StorageEngine<K, V> {
+export class InMemoryStore<K, V> implements StorageEngine<K, V> {
     private store: Map<K, VersionedValue<V>> = new Map();
 
     async get(key: K): Promise<VersionedValue<V> | undefined> {

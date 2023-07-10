@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "module": "es2022",
+        "declaration": true,
+        "module": "CommonJS",
         "noImplicitAny": true,
         "removeComments": true,
         "preserveConstEnums": true,
@@ -12,6 +13,6 @@
         "target": "es2022",
         "outDir": "dist/"
     },
-        "include": ["src/"],
+        "include": ["src"],
         "exclude": ["node_modules", "dist"]
 }

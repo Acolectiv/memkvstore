@@ -3,39 +3,21 @@ import fs from 'fs';
 import { RWLock } from 'async-rwlock';
 // @ts-ignore
 import { fork, ChildProcess } from 'child_process';
-// @ts-ignore
-import crypto from 'crypto';
 
-interface Command<K, V> {
-    type: 'set' | 'delete';
-    key: K;
-    value?: V;
-}
+import { InMemoryStore } from './storages/InMemoryStore';
 
-interface Event<K, V> {
-    type: 'set' | 'delete';
-    key: K;
-    value?: V;
-    version: number;
-}
-
-export interface VersionedValue<V> {
-    value: V;
-    version: number;
-}
-
-export interface StorageEngine<K, V> {
-    get(key: K): Promise<VersionedValue<V> | undefined>;
-    set(key: K, value: VersionedValue<V>): Promise<void>;
-    delete(key: K): Promise<void>;
-    entries(): Promise<[K, VersionedValue<V>][]>;
-}
+import {
+    Command,
+    Event,
+    StorageEngine,
+    VersionedValue
+} from "./types";
 
 export class Store<K, V> {
     private commands: Command<K, V>[] = [];
     private events: Event<K, V>[] = [];
     private timeouts: Map<K, any> = new Map();
-    private maxEntries: number | null;
+    private maxEntries: number | typeof Infinity;
     private lru: K[] = [];
     private lock: RWLock;
     private snapshots: Map<number, Map<K, VersionedValue<V>>> = new Map();
@@ -46,15 +28,13 @@ export class Store<K, V> {
     private nodes: ChildProcess[] = [];
     private consensus: Map<string, { yes: number, no: number }> = new Map();
     private partitions: Map<K, number> = new Map();
-    private secretKey: string;
     private versions: Map<K, VersionedValue<V>[]> = new Map();
     private batch: Command<K, V>[] = [];
 
-    constructor(storage: StorageEngine<K, V>, maxEntries?: number, walPath?: string, nodePaths?: string[], secretKey?: string) {
+    constructor(storage: StorageEngine<K, V> = new InMemoryStore<K, V>(), maxEntries?: number, walPath?: string, nodePaths?: string[]) {
         this.storage = storage;
-        this.maxEntries = maxEntries || null;
+        this.maxEntries = maxEntries || Infinity;
         this.lock = new RWLock();
-        this.secretKey = secretKey || '';
         if (walPath) {
             this.wal = fs.createWriteStream(walPath, { flags: 'a' });
         }
@@ -86,6 +66,7 @@ export class Store<K, V> {
             clearTimeout(this.timeouts.get(key)!);
             this.timeouts.delete(key);
         }
+
         await this.storage.set(key, versionedValue);
         this.commands.push({ type: 'set', key, value });
         this.events.push({ type: 'set', key, value, version: versionedValue.version });
@@ -102,8 +83,7 @@ export class Store<K, V> {
         index.push(key);
         this.secondaryIndex.set(value, index);
         if (this.wal) {
-            const encryptedValue = crypto.createCipher('aes-256-cbc', this.secretKey).update(JSON.stringify(versionedValue), 'utf8', 'hex');
-            this.wal.write(`${key} ${encryptedValue}\n`);
+            this.wal.write(`${key} ${versionedValue}\n`);
         }
     }
 
@@ -136,15 +116,9 @@ export class Store<K, V> {
     }
 
     public async get(key: K): Promise<{ value: V, version: number } | undefined> {
-        const events = this.events.filter(event => event.key === key);
-        if (events.length > 0) {
-            if (events.length > 1) {
-                const resolvedValue = this.resolveConflict(events.map(event => ({ value: event.value!, version: event.version })));
-                return { value: resolvedValue, version: events.length };
-            }
-            return { value: events[0].value!, version: events[0].version };
-        }
-        return undefined;
+        const existing = await this.storage.get(key);
+        if(existing) return { value: existing.value, version: existing.version };
+        else return undefined;
     }
 
     private resolveConflict(versionedValues: VersionedValue<V>[]): V {
