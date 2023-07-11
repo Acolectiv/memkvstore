@@ -1,5 +1,7 @@
 # MemKVStore
 
+[![Release MemKVStore](https://github.com/Acolectiv/memkvstore/actions/workflows/release_package.yml/badge.svg)](https://github.com/Acolectiv/memkvstore/actions/workflows/release_package.yml)
+
 `MemKVStore` is a key-value store class implemented in TypeScript. It supports a variety of advanced features, including time-to-live (TTL) for keys, secondary indexing, write-ahead logging (WAL), multi-node consensus, data partitioning, data compression and encryption, versioning and conflict resolution, batch operations and atomic transactions, event sourcing and CQRS (Command Query Responsibility Segregation), snapshots, and partitioning.
 
 ## Features
