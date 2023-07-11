@@ -58,7 +58,7 @@ export class Store<K, V> {
         }
     }
 
-    public async set(key: K, value: V, ttl?: number): Promise<void> {
+    public async set(key: K, value: V, ttl?: number): Promise<boolean> {
         const versionedValue: VersionedValue<V> = { value, version: 0 };
         const existing = await this.storage.get(key);
         if (existing) {
@@ -85,6 +85,8 @@ export class Store<K, V> {
         if (this.wal) {
             this.wal.write(`${key} ${versionedValue}\n`);
         }
+
+        return true;
     }
 
     public async delete(key: K): Promise<void> {
@@ -121,9 +123,10 @@ export class Store<K, V> {
         else return undefined;
     }
 
-    private resolveConflict(versionedValues: VersionedValue<V>[]): V {
-        versionedValues.sort((a, b) => b.version - a.version);
-        return versionedValues[0].value;
+    public async has(key: K): Promise<boolean> {
+        const existing = await this.storage.get(key);
+        if(existing) return true;
+        else return false;
     }
 
     public async batchSet(key: K, value: V, ttl?: number): Promise<void> {
@@ -181,5 +184,22 @@ export class Store<K, V> {
 
     public async setPartition(key: K, partition: number): Promise<void> {
         this.partitions.set(key, partition);
+    }
+
+    public async bulkSet(keys: K[], values: V[], ttl?: number[]): Promise<{ status: boolean, keys: number, values: number }> {
+        keys.forEach(async (key: K, index: number) => {
+            if(ttl && ttl[index]) await this.set(key, values[index], ttl[index] || null);
+            else await this.set(key, values[index]);
+        });
+        
+        return { status: true, keys: keys.length, values: values.length };
+    }
+
+    public async bulkDelete(keys: K[]): Promise<{ status: boolean, keysDeleted: number }> {
+        keys.forEach(async (key: K) => {
+            await this.delete(key);
+        });
+
+        return { status: true, keysDeleted: keys.length };
     }
 }
