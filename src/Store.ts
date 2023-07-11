@@ -13,6 +13,8 @@ import {
     VersionedValue
 } from "./types";
 
+import { ConstructorOptions } from './types/ConstructorOptions';
+
 export class Store<K, V> {
     private commands: Command<K, V>[] = [];
     private events: Event<K, V>[] = [];
@@ -32,16 +34,16 @@ export class Store<K, V> {
     private batch: Command<K, V>[] = [];
     private initialStorage: StorageEngine<K, V>;
 
-    constructor(storage: StorageEngine<K, V> = new InMemoryStore<K, V>(), maxEntries?: number, walPath?: string, nodePaths?: string[]) {
-        this.initialStorage = storage;
-        this.storage = storage;
-        this.maxEntries = maxEntries || Infinity;
+    constructor(opts?: ConstructorOptions<K, V>) {
+        this.initialStorage = opts && opts.storage || new InMemoryStore<K, V>();
+        this.storage = opts && opts.storage || new InMemoryStore<K, V>();
+        this.maxEntries = opts && opts.maxEntries || Infinity;
         this.lock = new RWLock();
-        if (walPath) {
-            this.wal = fs.createWriteStream(walPath, { flags: 'a' });
+        if (opts && opts.walPath) {
+            this.wal = fs.createWriteStream(opts.walPath, { flags: 'a' });
         }
-        if (nodePaths) {
-            for (const nodePath of nodePaths) {
+        if (opts && opts.nodePaths) {
+            for (const nodePath of opts.nodePaths) {
                 const node = fork(nodePath);
                 node.on('message', (message: any) => {
                     if (message.type === 'consensus') {
