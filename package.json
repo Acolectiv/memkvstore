@@ -9,7 +9,8 @@
     "@babel/plugin-proposal-class-properties": "^7.18.6",
     "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
     "@babel/preset-typescript": "^7.21.0",
-    "eslint-plugin-typescript": "^0.14.0"
+    "eslint-plugin-typescript": "^0.14.0",
+    "npm-insights": "^2.0.1"
   },
   "type": "commonjs",
   "name": "memkvstore",
@@ -19,5 +20,8 @@
   "keywords": [],
   "author": "Alexa Matei",
   "license": "ISC",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "postinstall": "npm-insights:log"
+  }
 }
