@@ -19,6 +19,7 @@ jobs:
         with:
           registry-url: https://registry.npmjs.org/
           node-version: '18'
+      - run: npm install
 
       # Configure Git
       - name: Git configuration
