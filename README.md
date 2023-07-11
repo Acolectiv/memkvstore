@@ -32,7 +32,20 @@ let store = new Store<any, any>();
 That's it! You can now use the *store* instance as following:
 
 ```typescript
-await store.set("key", "value"); // it will return undefined
+await store.set("key", "value", tll?); // it will return true
+
 await store.get("key"); // it will return { value: "value", version: 0 } (example)
-await store.delete("key"); // it will return undefined
+
+await store.delete("key"); // it will return { status: true, keyDeleted: key }
+
+await store.bulkSet(
+    ["key1", "key2", "key3"],
+    ["val1", "val2", "val3"]
+); // it will return { status: true, keys: keys.length, values: values.length }
+
+await store.bulkDelete(
+    ["key1", "key2", "key3"]
+); // it will return { status: true, keysDeleted: keys.length }
+
+await store.resetSession(); // it will return undefined
 ```

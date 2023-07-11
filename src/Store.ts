@@ -30,8 +30,10 @@ export class Store<K, V> {
     private partitions: Map<K, number> = new Map();
     private versions: Map<K, VersionedValue<V>[]> = new Map();
     private batch: Command<K, V>[] = [];
+    private initialStorage: StorageEngine<K, V>;
 
     constructor(storage: StorageEngine<K, V> = new InMemoryStore<K, V>(), maxEntries?: number, walPath?: string, nodePaths?: string[]) {
+        this.initialStorage = storage;
         this.storage = storage;
         this.maxEntries = maxEntries || Infinity;
         this.lock = new RWLock();
@@ -89,7 +91,7 @@ export class Store<K, V> {
         return true;
     }
 
-    public async delete(key: K): Promise<void> {
+    public async delete(key: K): Promise<{ status: boolean, keyDeleted: K }> {
         const existing = await this.storage.get(key);
         if (existing) {
             await this.storage.delete(key);
@@ -114,6 +116,8 @@ export class Store<K, V> {
             if (this.wal) {
                 this.wal.write(`${key} null\n`);
             }
+
+            return { status: true, keyDeleted: key };
         }
     }
 
@@ -201,5 +205,12 @@ export class Store<K, V> {
         });
 
         return { status: true, keysDeleted: keys.length };
+    }
+
+    public async resetSession(): Promise<void> {
+        this.storage = this.initialStorage;
+        this.events = [];
+        this.commands = [];
+        this.secondaryIndex = new Map<V, K[]>();
     }
 }

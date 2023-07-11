@@ -12,9 +12,8 @@ test("get", async() => {
 });
 
 test("delete", async() => {
-    await store.delete("key");
-    let val = (await store.get("key"));
-    expect(val).toBe(undefined);
+    let val = await store.delete("key");
+    expect(val).toStrictEqual({ status: true, keyDeleted: "key" });
 });
 
 test("bulkSet", async() => {
