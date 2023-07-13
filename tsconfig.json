@@ -13,6 +13,6 @@
         "target": "es2022",
         "outDir": "dist/"
     },
-        "include": ["src"],
+        "include": ["src", "src/Store.ts"],
         "exclude": ["node_modules", "dist"]
 }
