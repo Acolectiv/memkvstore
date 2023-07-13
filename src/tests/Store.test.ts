@@ -17,11 +17,18 @@ test("delete", async() => {
 });
 
 test("bulkSet", async() => {
-    let res = await store.bulkSet(["key1", "key2", "key3"], ["val1", "val2", "val3"]);
-    expect(res).toStrictEqual({ status: true, keys: ["key1", "key2", "key3"].length, values: ["val1", "val2", "val3"].length })
+    let keys = ["key1", "key2", "key3"];
+    let values = ["val1", "val2", "val3"];
+
+    let res = await store.bulkSet(keys, values);
+
+    expect(res).toStrictEqual({ status: true, keys: keys.length, values: values.length })
 });
 
 test("bulkDelete", async() => {
-    let res = await store.bulkDelete(["key1", "key2", "key3"]);
-    expect(res).toStrictEqual({ status: true, keysDeleted: ["key1", "key2", "key3"].length })
+    let keys = ["key1", "key2", "key3"];
+
+    let res = await store.bulkDelete(keys);
+
+    expect(res).toStrictEqual({ status: true, keysDeleted: keys.length })
 });
