@@ -133,8 +133,7 @@ export class Store<K, V> {
 
     public async has(key: K): Promise<boolean> {
         const existing = await this.storage.get(key);
-        if(existing) return true;
-        else return false;
+        return !!existing;
     }
 
     public async batchSet(key: K, value: V, ttl?: number): Promise<void> {

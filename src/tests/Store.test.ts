@@ -11,6 +11,11 @@ test("get", async() => {
     expect(val).toBe("value");
 });
 
+test("has", async() => {
+    let val = await store.has("key");
+    expect(val).toBeTruthy();
+});
+
 test("delete", async() => {
     let val = await store.delete("key");
     expect(val).toStrictEqual({ status: true, keyDeleted: "key" });
