@@ -1,4 +1,5 @@
-import { StorageEngine } from "./types";
+import { Event } from "./types";
+import { ConstructorOptions } from './types/ConstructorOptions';
 export declare class Store<K, V> {
     private commands;
     private events;
@@ -16,14 +17,18 @@ export declare class Store<K, V> {
     private partitions;
     private versions;
     private batch;
-    constructor(storage?: StorageEngine<K, V>, maxEntries?: number, walPath?: string, nodePaths?: string[]);
-    set(key: K, value: V, ttl?: number): Promise<void>;
-    delete(key: K): Promise<void>;
+    private initialStorage;
+    constructor(opts?: ConstructorOptions<K, V>);
+    set(key: K, value: V, ttl?: number): Promise<boolean>;
+    delete(key: K): Promise<{
+        status: boolean;
+        keyDeleted: K;
+    }>;
     get(key: K): Promise<{
         value: V;
         version: number;
     } | undefined>;
-    private resolveConflict;
+    has(key: K): Promise<boolean>;
     batchSet(key: K, value: V, ttl?: number): Promise<void>;
     batchDelete(key: K): Promise<void>;
     executeBatch(): Promise<void>;
@@ -31,4 +36,15 @@ export declare class Store<K, V> {
     restore(snapshotVersion: number): Promise<void>;
     getPartition(key: K): Promise<number>;
     setPartition(key: K, partition: number): Promise<void>;
+    bulkSet(keys: K[], values: V[], ttl?: number[]): Promise<{
+        status: boolean;
+        keys: number;
+        values: number;
+    }>;
+    bulkDelete(keys: K[]): Promise<{
+        status: boolean;
+        keysDeleted: number;
+    }>;
+    getEvents(): Event<K, V>[];
+    resetSession(): Promise<void>;
 }

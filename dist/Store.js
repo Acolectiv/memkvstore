@@ -25,15 +25,17 @@ class Store {
     partitions = new Map();
     versions = new Map();
     batch = [];
-    constructor(storage = new InMemoryStore_1.InMemoryStore(), maxEntries, walPath, nodePaths) {
-        this.storage = storage;
-        this.maxEntries = maxEntries || Infinity;
+    initialStorage;
+    constructor(opts) {
+        this.initialStorage = opts?.storage || new InMemoryStore_1.InMemoryStore();
+        this.storage = opts?.storage || new InMemoryStore_1.InMemoryStore();
+        this.maxEntries = opts?.maxEntries || Infinity;
         this.lock = new async_rwlock_1.RWLock();
-        if (walPath) {
-            this.wal = fs_1.default.createWriteStream(walPath, { flags: 'a' });
+        if (opts?.walPath) {
+            this.wal = fs_1.default.createWriteStream(opts.walPath, { flags: 'a' });
         }
-        if (nodePaths) {
-            for (const nodePath of nodePaths) {
+        if (opts?.nodePaths) {
+            for (const nodePath of opts.nodePaths) {
                 const node = (0, child_process_1.fork)(nodePath);
                 node.on('message', (message) => {
                     if (message.type === 'consensus') {
@@ -78,6 +80,7 @@ class Store {
         if (this.wal) {
             this.wal.write(`${key} ${versionedValue}\n`);
         }
+        return true;
     }
     async delete(key) {
         const existing = await this.storage.get(key);
@@ -105,7 +108,9 @@ class Store {
             if (this.wal) {
                 this.wal.write(`${key} null\n`);
             }
+            return { status: true, keyDeleted: key };
         }
+        return { status: false, keyDeleted: null };
     }
     async get(key) {
         const existing = await this.storage.get(key);
@@ -114,9 +119,12 @@ class Store {
         else
             return undefined;
     }
-    resolveConflict(versionedValues) {
-        versionedValues.sort((a, b) => b.version - a.version);
-        return versionedValues[0].value;
+    async has(key) {
+        const existing = await this.storage.get(key);
+        if (existing)
+            return true;
+        else
+            return false;
     }
     async batchSet(key, value, ttl) {
         this.batch.push({ type: 'set', key, value });
@@ -169,6 +177,32 @@ class Store {
     }
     async setPartition(key, partition) {
         this.partitions.set(key, partition);
+    }
+    async bulkSet(keys, values, ttl) {
+        if (keys.length !== values.length)
+            throw new Error(`The values of \'keys\' and \'values\' should match.`);
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = values[i];
+            const t = ttl ? ttl[i] : undefined;
+            await this.set(key, value, t);
+        }
+        return { status: true, keys: keys.length, values: values.length };
+    }
+    async bulkDelete(keys) {
+        for (const key of keys) {
+            await this.delete(key);
+        }
+        return { status: true, keysDeleted: keys.length };
+    }
+    getEvents() {
+        return [...this.events];
+    }
+    async resetSession() {
+        this.storage = this.initialStorage;
+        this.events = [];
+        this.commands = [];
+        this.secondaryIndex = new Map();
     }
 }
 exports.Store = Store;

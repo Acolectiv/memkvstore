@@ -29,6 +29,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "build": "tsc"
   }
 }
