@@ -62,35 +62,71 @@ export class Store<K, V> {
         }
     }
 
+    // public async set(key: K, value: V, ttl?: number): Promise<boolean> {
+    //     const versionedValue: VersionedValue<V> = { value, version: 0 };
+    //     const existing = await this.storage.get(key);
+    //     if (existing) {
+    //         versionedValue.version = existing.version + 1;
+    //         clearTimeout(this.timeouts.get(key)!);
+    //         this.timeouts.delete(key);
+    //     }
+
+    //     await this.storage.set(key, versionedValue);
+    //     this.commands.push({ type: 'set', key, value });
+    //     this.events.push({ type: 'set', key, value, version: versionedValue.version });
+    //     if (ttl) {
+    //         const timeout = setTimeout(() => this.delete(key), ttl);
+    //         this.timeouts.set(key, timeout);
+    //     }
+    //     this.lru.unshift(key);
+    //     if (this.lru.length > this.maxEntries!) {
+    //         const evictedKey = this.lru.pop()!;
+    //         await this.storage.delete(evictedKey);
+    //     }
+    //     const index = this.secondaryIndex.get(value) || [];
+    //     index.push(key);
+    //     this.secondaryIndex.set(value, index);
+    //     if (this.wal) {
+    //         this.wal.write(`${key} ${versionedValue}\n`);
+    //     }
+
+    //     return true;
+    // }
+
     public async set(key: K, value: V, ttl?: number): Promise<boolean> {
-        const versionedValue: VersionedValue<V> = { value, version: 0 };
         const existing = await this.storage.get(key);
+        let versionedValue: VersionedValue<V> = { value, version: 0 };
+        
         if (existing) {
-            versionedValue.version = existing.version + 1;
+          const newVersion = existing.version + 1;
+          versionedValue = { value, version: newVersion };
+        }
+      
+        const success = await this.storage.compareAndSwap(key, existing, versionedValue);
+
+        if (success) {
+            this.commands.push({ type: 'set', key, value });
+            this.events.push({ type: 'set', key, value, version: versionedValue.version });
+            
             clearTimeout(this.timeouts.get(key)!);
             this.timeouts.delete(key);
+        
+            this.lru.unshift(key);
+            if (this.lru.length > this.maxEntries!) {
+                const evictedKey = this.lru.pop()!;
+                await this.storage.delete(evictedKey);
+            }
+        
+            const index = this.secondaryIndex.get(value) || [];
+            index.push(key);
+            this.secondaryIndex.set(value, index);
+        
+            if (this.wal) {
+                this.wal.write(`${key} ${JSON.stringify(versionedValue)}\n`);
+            }
         }
 
-        await this.storage.set(key, versionedValue);
-        this.commands.push({ type: 'set', key, value });
-        this.events.push({ type: 'set', key, value, version: versionedValue.version });
-        if (ttl) {
-            const timeout = setTimeout(() => this.delete(key), ttl);
-            this.timeouts.set(key, timeout);
-        }
-        this.lru.unshift(key);
-        if (this.lru.length > this.maxEntries!) {
-            const evictedKey = this.lru.pop()!;
-            await this.storage.delete(evictedKey);
-        }
-        const index = this.secondaryIndex.get(value) || [];
-        index.push(key);
-        this.secondaryIndex.set(value, index);
-        if (this.wal) {
-            this.wal.write(`${key} ${versionedValue}\n`);
-        }
-
-        return true;
+        return success;
     }
 
     public async delete(key: K): Promise<{ status: boolean, keyDeleted: K }> {
