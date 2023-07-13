@@ -13,10 +13,12 @@ import {
     VersionedValue
 } from "./types";
 
+import { ConstructorOptions } from './types/ConstructorOptions';
+
 export class Store<K, V> {
     private commands: Command<K, V>[] = [];
     private events: Event<K, V>[] = [];
-    private timeouts: Map<K, any> = new Map();
+    private timeouts: Map<K, NodeJS.Timeout> = new Map();
     private maxEntries: number | typeof Infinity;
     private lru: K[] = [];
     private lock: RWLock;
@@ -30,16 +32,18 @@ export class Store<K, V> {
     private partitions: Map<K, number> = new Map();
     private versions: Map<K, VersionedValue<V>[]> = new Map();
     private batch: Command<K, V>[] = [];
+    private initialStorage: StorageEngine<K, V>;
 
-    constructor(storage: StorageEngine<K, V> = new InMemoryStore<K, V>(), maxEntries?: number, walPath?: string, nodePaths?: string[]) {
-        this.storage = storage;
-        this.maxEntries = maxEntries || Infinity;
+    constructor(opts?: ConstructorOptions<K, V>) {
+        this.initialStorage = opts?.storage || new InMemoryStore<K, V>();
+        this.storage = opts?.storage || new InMemoryStore<K, V>();
+        this.maxEntries = opts?.maxEntries || Infinity;
         this.lock = new RWLock();
-        if (walPath) {
-            this.wal = fs.createWriteStream(walPath, { flags: 'a' });
+        if (opts?.walPath) {
+            this.wal = fs.createWriteStream(opts.walPath, { flags: 'a' });
         }
-        if (nodePaths) {
-            for (const nodePath of nodePaths) {
+        if (opts?.nodePaths) {
+            for (const nodePath of opts.nodePaths) {
                 const node = fork(nodePath);
                 node.on('message', (message: any) => {
                     if (message.type === 'consensus') {
@@ -58,7 +62,7 @@ export class Store<K, V> {
         }
     }
 
-    public async set(key: K, value: V, ttl?: number): Promise<void> {
+    public async set(key: K, value: V, ttl?: number): Promise<boolean> {
         const versionedValue: VersionedValue<V> = { value, version: 0 };
         const existing = await this.storage.get(key);
         if (existing) {
@@ -85,9 +89,11 @@ export class Store<K, V> {
         if (this.wal) {
             this.wal.write(`${key} ${versionedValue}\n`);
         }
+
+        return true;
     }
 
-    public async delete(key: K): Promise<void> {
+    public async delete(key: K): Promise<{ status: boolean, keyDeleted: K }> {
         const existing = await this.storage.get(key);
         if (existing) {
             await this.storage.delete(key);
@@ -112,7 +118,11 @@ export class Store<K, V> {
             if (this.wal) {
                 this.wal.write(`${key} null\n`);
             }
+
+            return { status: true, keyDeleted: key };
         }
+
+        return { status: false, keyDeleted: null };
     }
 
     public async get(key: K): Promise<{ value: V, version: number } | undefined> {
@@ -121,9 +131,10 @@ export class Store<K, V> {
         else return undefined;
     }
 
-    private resolveConflict(versionedValues: VersionedValue<V>[]): V {
-        versionedValues.sort((a, b) => b.version - a.version);
-        return versionedValues[0].value;
+    public async has(key: K): Promise<boolean> {
+        const existing = await this.storage.get(key);
+        if(existing) return true;
+        else return false;
     }
 
     public async batchSet(key: K, value: V, ttl?: number): Promise<void> {
@@ -181,5 +192,37 @@ export class Store<K, V> {
 
     public async setPartition(key: K, partition: number): Promise<void> {
         this.partitions.set(key, partition);
+    }
+
+    public async bulkSet(keys: K[], values: V[], ttl?: number[]): Promise<{ status: boolean, keys: number, values: number }> {
+        if(keys.length !== values.length) throw new Error(`The values of \'keys\' and \'values\' should match.`);
+        
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = values[i];
+            const t = ttl ? ttl[i] : undefined;
+            await this.set(key, value, t);
+        }
+        
+        return { status: true, keys: keys.length, values: values.length };
+    }
+
+    public async bulkDelete(keys: K[]): Promise<{ status: boolean, keysDeleted: number }> {
+        for (const key of keys) {
+            await this.delete(key);
+        }
+
+        return { status: true, keysDeleted: keys.length };
+    }
+
+    public getEvents(): Event<K, V>[] {
+        return [...this.events];
+    }
+
+    public async resetSession(): Promise<void> {
+        this.storage = this.initialStorage;
+        this.events = [];
+        this.commands = [];
+        this.secondaryIndex = new Map<V, K[]>();
     }
 }
