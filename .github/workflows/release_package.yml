@@ -28,8 +28,9 @@ jobs:
           git config --global user.name "GitHub Actions"
 
       - name: Run tests
-        run: Build dist
-        run: npm run build    
+        run: npm run test
+      - name: Build source
+        run: npm run build
 
       # Bump package version
       # Use tag latest
